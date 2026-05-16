@@ -1,0 +1,329 @@
+{
+  "name": "Event Request Alert by Zipcode - Demo",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "Event Request Alert by ZIP Code\n\n\nWhat?\n\nThis workflow identifies when enough people in the same ZIP-code area request a future n8n community event.\n\n\nHow?\n\nA user submits a short form with their name, email, ZIP code, preferred event type, and optional topic.\n\nThe workflow saves the request in Google Sheets, reads all requests, removes duplicate submissions for the same email and ZIP code, and groups demand by ZIP-code prefix.\n\nWhen 5 or more unique people request an event in the same ZIP-code area, the workflow sends a Slack alert to the marketing/community team.\n\n\nNext steps:\n- The team decides whether to plan a meetup, workshop, hack night, or live build session.\n- If an event is organized in that area, users who requested it can automatically be notified.\n- Future versions could add true radius mapping, ambassador matching, Notion/Jira follow-up, and a data dashboard.\n\n",
+        "height": 672,
+        "width": 432
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        -512
+      ],
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "formTitle": "Request an n8n meetup near you",
+        "formDescription": "Don\u2019t see your city? Submit your ZIP code and event interest.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Full Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "ZIP Code",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Event Type",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Meetup"
+                  },
+                  {
+                    "option": "Workshop"
+                  },
+                  {
+                    "option": "Hack Night"
+                  },
+                  {
+                    "option": "Live Build Session"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Topic or Question"
+            }
+          ]
+        },
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "Thanks for submitting your request. We\u2019ll notify you if an n8n event, workshop, hack night, or meetup is organized near your area."
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        720,
+        -160
+      ],
+      "name": "Request Event Form"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "DEMO_GOOGLE_SHEET_ID",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Requests",
+          "cachedResultUrl": "[demo Google Sheet URL removed]"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "submitted_at": "={{$now}}",
+            "email": "={{$json[\"Email\"]}}",
+            "zip": "={{$json[\"ZIP Code\"]}}",
+            "event_type": "={{$json[\"Event Type\"]}}",
+            "topic": "={{$json[\"Topic or Question\"]}}",
+            "Full Name": "={{$json[\"Full Name\"]}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "displayName": "Full Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "displayName": "zip",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        944,
+        -160
+      ],
+      "name": "Save Request"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "DEMO_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Community Event Demand Requests",
+          "cachedResultUrl": "[demo Google Sheet URL removed]"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Requests",
+          "cachedResultUrl": "[demo Google Sheet URL removed]"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1168,
+        -160
+      ],
+      "name": "Read All Requests"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(item => item.json);\n\nconst clean = value => String(value || '').trim().toLowerCase();\n\nconst cleanZip = value => {\n  return String(value || '')\n    .trim()\n    .replace(/\\D/g, '')\n    .slice(0, 5);\n};\n\nconst latest = rows[rows.length - 1];\n\nconst latestZip = cleanZip(latest.zip);\nconst latestZipCluster = latestZip.slice(0, 3);\n\nconst zipClusterLookup = {\n  '908': 'Long Beach area',\n  '900': 'Los Angeles area',\n  '902': 'West LA / Santa Monica area',\n  '941': 'San Francisco area',\n  '946': 'Oakland area',\n  '921': 'San Diego area',\n  '787': 'Austin area',\n  '100': 'New York City area',\n};\n\nconst locationLabel = zipClusterLookup[latestZipCluster] || `ZIP cluster ${latestZipCluster}xx`;\n\nconst uniqueMap = new Map();\n\nfor (const row of rows) {\n  const email = clean(row.email);\n  const zip = cleanZip(row.zip);\n\n  if (!email || !zip) continue;\n\n  const key = `${email}_${zip}`;\n  uniqueMap.set(key, {\n    email,\n    zip,\n    zip_cluster: zip.slice(0, 3),\n    event_type: row.event_type || '',\n    topic: row.topic || '',\n  });\n}\n\nconst uniqueRequests = Array.from(uniqueMap.values());\n\nconst matchingRequests = uniqueRequests.filter(request => {\n  return request.zip_cluster === latestZipCluster;\n});\n\nconst eventTypeCounts = {};\n\nfor (const request of matchingRequests) {\n  const eventType = request.event_type || 'Not specified';\n  eventTypeCounts[eventType] = (eventTypeCounts[eventType] || 0) + 1;\n}\n\nconst topEventType = Object.entries(eventTypeCounts)\n  .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Not specified';\n\nreturn [\n  {\n    json: {\n      latest_zip: latestZip,\n      zip_cluster: `${latestZipCluster}xx`,\n      location_label: locationLabel,\n      request_count: matchingRequests.length,\n      top_event_type: topEventType,\n      threshold_met: matchingRequests.length >= 5,\n      slack_message: `\ud83d\udea8 Event Request Alert by ZIP Code\n\n${matchingRequests.length} unique people have requested an n8n event near ${locationLabel} (${latestZipCluster}xx).\n\nMost requested event type: ${topEventType}`\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        -160
+      ],
+      "name": "Detect ZIP Demand"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.request_count}}",
+              "rightValue": 5,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1616,
+        -160
+      ],
+      "name": "Reached 5+ Requests?"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "DEMO_SLACK_CHANNEL_ID",
+          "mode": "list",
+          "cachedResultName": "community-demo"
+        },
+        "text": "={{$json.slack_message}}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1888,
+        -288
+      ],
+      "name": "Notify Marketing Team"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Request Event Form": {
+      "main": [
+        [
+          {
+            "node": "Save Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Request": {
+      "main": [
+        [
+          {
+            "node": "Read All Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read All Requests": {
+      "main": [
+        [
+          {
+            "node": "Detect ZIP Demand",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect ZIP Demand": {
+      "main": [
+        [
+          {
+            "node": "Reached 5+ Requests?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reached 5+ Requests?": {
+      "main": [
+        [
+          {
+            "node": "Notify Marketing Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": [
+    {
+      "updatedAt": "2026-05-12T03:24:52.869Z",
+      "createdAt": "2026-05-12T03:24:52.869Z",
+      "name": "Interview"
+    }
+  ]
+}
